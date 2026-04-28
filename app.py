@@ -4,12 +4,16 @@
 # Equipe : Arthur, Mandengue, Moneli
 # =============================================================================
 
+# streamlit : la librairie qui crée l'interface web
 import streamlit as st
+# pandas et numpy : manipulation des données et calculs
 import pandas as pd
 import numpy as np
+# matplotlib et seaborn : création des graphiques
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import seaborn as sns
+# pickle : permet de charger le modèle ML sauvegardé par Arthur
 import pickle
 import os
 import sys
@@ -17,9 +21,13 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config
 
+# train_test_split : sépare les données en jeu d'entraînement (80%) et de test (20%)
 from sklearn.model_selection import train_test_split
+# LinearRegression : modèle de régression linéaire (modèle de référence simple)
 from sklearn.linear_model import LinearRegression
+# LabelEncoder : convertit les catégories texte en chiffres (Maison=1, Appartement=0)
 from sklearn.preprocessing import LabelEncoder
+# métriques d'évaluation : R², MAE et RMSE pour mesurer la qualité des prédictions
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 
 # =============================================================================
@@ -79,36 +87,60 @@ st.markdown("""
 
 @st.cache_data
 def load_data():
+    # On lit les deux fichiers CSV séparément
     df24 = pd.read_csv(config.CSV_2024)
     df25 = pd.read_csv(config.CSV_2025)
+
+    # On les fusionne en un seul DataFrame (concaténation verticale)
     df = pd.concat([df24, df25], ignore_index=True)
+
+    # On garde uniquement Maison et Appartement (on ignore les dépendances, locaux, etc.)
     df = df[df[config.COL_TYPE].isin(config.TYPES_BIENS)].copy()
+
+    # On supprime les lignes incomplètes (sans prix ou sans surface)
     df = df.dropna(subset=[config.COL_PRIX, config.COL_SURFACE])
+
+    # On extrait l'année et le mois depuis la date de mutation
     df['date_mutation'] = pd.to_datetime(df[config.COL_DATE])
     df['annee'] = df['date_mutation'].dt.year
     df['mois']  = df['date_mutation'].dt.month
+
+    # Feature engineering : calcul du prix au m² (variable très corrélée au prix total)
     df['prix_m2'] = df[config.COL_PRIX] / df[config.COL_SURFACE]
+
+    # Suppression des valeurs aberrantes : prix/m² trop bas ou trop haut sont des erreurs de saisie
     df = df[(df['prix_m2'] > 200) & (df['prix_m2'] < 15000)]
+    # On supprime les biens avec une surface irréaliste (> 1000 m²) ou un prix < 5000 €
     df = df[df[config.COL_SURFACE] < 1000]
     df = df[df[config.COL_PRIX] > 5000]
     return df
 
 @st.cache_resource
 def load_model():
+    # On charge le modèle Random Forest entraîné par Arthur et sauvegardé en .pkl
+    # Le format pickle permet de sauvegarder n'importe quel objet Python sur le disque
     with open(config.MODEL_OBJ1, 'rb') as f:
         return pickle.load(f)
 
 df    = load_data()
 model = load_model()
 
+# Encodage du type de bien : le modèle ne comprend que des chiffres, pas du texte
+# Maison = 1, Appartement = 0
 le = LabelEncoder()
 df['type_encode'] = le.fit_transform(df[config.COL_TYPE])
 
+# On récupère la liste exacte des features utilisées lors de l'entraînement du modèle
+# Cela garantit qu'on passe les bonnes colonnes dans le bon ordre au moment de prédire
 FEATURES = list(model.feature_names_in_)
-X = df[FEATURES].fillna(0)
+X = df[FEATURES].fillna(0)  # Les valeurs manquantes sont remplacées par 0
 y = df[config.COL_PRIX]
+
+# Split 80% entraînement / 20% test — random_state=42 garantit la reproductibilité
+# Cela signifie qu'on obtiendra toujours la même division si on relance le code
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
+# Couleurs cohérentes pour tous les graphiques du dashboard
 COULEURS = {'Maison': '#0D9488', 'Appartement': '#6366F1'}
 
 # =============================================================================
@@ -122,15 +154,15 @@ with st.sidebar:
         "Navigation",
         [
             "Introduction",
-            "Exploration des donnees",
-            "Comparaison des modeles",
-            "Prediction interactive",
-            "Evolution 2024 - 2026"
+            "Exploration des données",
+            "Comparaison des modèles",
+            "Prédiction interactive",
+            "Évolution 2024 - 2026"
         ],
         label_visibility="collapsed"
     )
     st.markdown("---")
-    st.markdown("**Equipe**")
+    st.markdown("**Équipe**")
     st.markdown("Arthur · Mandengue · Moneli")
     st.markdown("---")
     st.markdown(f"**{len(df):,}** transactions")
@@ -142,15 +174,15 @@ with st.sidebar:
 
 if page == "Introduction":
 
-    st.title("Prediction des prix immobiliers")
-    st.markdown("**Maine-et-Loire (Dept. 49) — Machine Learning sur donnees DVF**")
+    st.title("Prédiction des prix immobiliers")
+    st.markdown("**Maine-et-Loire (Dept. 49) — Machine Learning sur données DVF**")
     st.markdown("---")
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Transactions",     f"{len(df):,}")
-    col2.metric("Annees couvertes", "2024 + 2025")
-    col3.metric("Annee predite",    "2026")
-    col4.metric("Modele principal", "Random Forest")
+    col1.metric("Transactions",      f"{len(df):,}")
+    col2.metric("Années couvertes",  "2024 + 2025")
+    col3.metric("Année prédite",     "2026")
+    col4.metric("Modèle principal",  "Random Forest")
 
     st.markdown("---")
     col1, col2 = st.columns(2)
@@ -158,40 +190,41 @@ if page == "Introduction":
     with col1:
         st.markdown('<p class="titre-section">Contexte</p>', unsafe_allow_html=True)
         st.markdown("""
-        Le marche immobilier du Maine-et-Loire connait des evolutions constantes.
-        Anticiper les prix permet aux acheteurs et investisseurs de mieux se positionner.
+        Le marché immobilier du Maine-et-Loire évolue constamment.
+        Anticiper les prix permet aux acheteurs et aux investisseurs de mieux se positionner
+        avant de prendre une décision.
 
-        Ce projet utilise les **Demandes de Valeurs Foncieres (DVF)**, open data
-        gouvernemental, pour entrainer un modele capable de predire les prix de vente en 2026.
+        Ce projet s'appuie sur les **Demandes de Valeurs Foncières (DVF)**, une base de données
+        open data du gouvernement, pour entraîner un modèle capable de prédire les prix de vente en 2026.
         """)
 
-        st.markdown('<p class="titre-section">Pipeline</p>', unsafe_allow_html=True)
+        st.markdown('<p class="titre-section">Pipeline du projet</p>', unsafe_allow_html=True)
         st.markdown("""
-        1. **Collecte** — DVF open data, 64 000 transactions 2024 + 2025
-        2. **Nettoyage** — suppression doublons, filtres aberrants
-        3. **Feature engineering** — prix/m², encodage type, annee/mois
-        4. **Modelisation** — Regression Lineaire vs Random Forest
-        5. **Prediction** — estimation des prix 2026 par type de bien
+        1. **Collecte** — DVF open data, 64 000 transactions réelles (2024 + 2025)
+        2. **Nettoyage** — suppression des doublons et des valeurs aberrantes
+        3. **Feature engineering** — calcul du prix/m², encodage du type de bien, extraction de l'année et du mois
+        4. **Modélisation** — comparaison Régression Linéaire vs Random Forest
+        5. **Prédiction** — estimation des prix 2026 par type de bien et zone géographique
         """)
 
     with col2:
-        st.markdown('<p class="titre-section">Repartition de l\'equipe</p>', unsafe_allow_html=True)
+        st.markdown('<p class="titre-section">Répartition de l\'équipe</p>', unsafe_allow_html=True)
         equipe = pd.DataFrame({
-            "Membre":   ["Arthur", "Mandengue", "Moneli"],
-            "Role":     [
-                "Fusion + nettoyage + modele Obj.1",
-                "EDA + features + modele Obj.2",
-                "Scenarios 2026 + predictions + visualisations"
+            "Membre":    ["Arthur", "Mandengue", "Moneli"],
+            "Rôle":      [
+                "Fusion + nettoyage + modèle Obj.1",
+                "EDA + sélection des features + modèle Obj.2",
+                "Scénarios 2026 + prédictions + visualisations"
             ],
             "Livrable": [
                 "data_clean.csv + model_obj1.pkl",
                 "features_list.py + model_obj2.pkl",
-                "predictions_2026.csv + graphes"
+                "predictions_2026.csv + graphiques"
             ]
         })
         st.dataframe(equipe, hide_index=True, use_container_width=True)
 
-        st.markdown('<p class="titre-section">Repartition des biens</p>', unsafe_allow_html=True)
+        st.markdown('<p class="titre-section">Répartition des biens</p>', unsafe_allow_html=True)
         col_a, col_b = st.columns(2)
         col_a.metric("Maisons",      f"{df[df[config.COL_TYPE]=='Maison'].shape[0]:,}")
         col_b.metric("Appartements", f"{df[df[config.COL_TYPE]=='Appartement'].shape[0]:,}")
@@ -200,19 +233,20 @@ if page == "Introduction":
 # PAGE 2 — EDA
 # =============================================================================
 
-elif page == "Exploration des donnees":
+elif page == "Exploration des données":
 
-    st.title("Exploration des donnees")
+    st.title("Exploration des données")
+    st.markdown("Analyse exploratoire réalisée avant la modélisation.")
     st.markdown("---")
 
     filtre = st.selectbox("Filtrer par type de bien", ["Tous", "Maison", "Appartement"])
     df_eda = df if filtre == "Tous" else df[df[config.COL_TYPE] == filtre]
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Prix median",     f"{df_eda[config.COL_PRIX].median():,.0f} €")
+    col1.metric("Prix médian",     f"{df_eda[config.COL_PRIX].median():,.0f} €")
     col2.metric("Prix moyen",      f"{df_eda[config.COL_PRIX].mean():,.0f} €")
-    col3.metric("Surface mediane", f"{df_eda[config.COL_SURFACE].median():.0f} m²")
-    col4.metric("Prix/m² median",  f"{df_eda['prix_m2'].median():,.0f} €/m²")
+    col3.metric("Surface médiane", f"{df_eda[config.COL_SURFACE].median():.0f} m²")
+    col4.metric("Prix/m² médian",  f"{df_eda['prix_m2'].median():,.0f} €/m²")
 
     col1, col2 = st.columns(2)
 
@@ -257,7 +291,7 @@ elif page == "Exploration des donnees":
         st.pyplot(fig)
         plt.close()
 
-    st.markdown('<p class="titre-section">Matrice de correlation</p>', unsafe_allow_html=True)
+    st.markdown('<p class="titre-section">Matrice de corrélation</p>', unsafe_allow_html=True)
     cols_corr = [config.COL_PRIX, config.COL_SURFACE, config.COL_PIECES,
                  'prix_m2', 'annee', 'mois']
     corr = df[cols_corr].corr()
@@ -273,18 +307,30 @@ elif page == "Exploration des donnees":
 # PAGE 3 — COMPARAISON DES MODELES
 # =============================================================================
 
-elif page == "Comparaison des modeles":
+elif page == "Comparaison des modèles":
 
-    st.title("Comparaison des modeles")
-    st.markdown("Regression Lineaire vs Random Forest")
+    st.title("Comparaison des modèles")
+    st.markdown("Régression Linéaire vs Random Forest — quel modèle prédit le mieux les prix ?")
     st.markdown("---")
 
+    # --- Régression Linéaire ---
+    # Modèle simple qui cherche une droite (y = ax + b) pour expliquer le prix
+    # Il est utilisé comme référence pour voir si le Random Forest fait mieux
     lr = LinearRegression()
-    lr.fit(X_train, y_train)
-    y_pred_lr = lr.predict(X_test)
+    lr.fit(X_train, y_train)       # Entraînement sur 80% des données
+    y_pred_lr = lr.predict(X_test) # Prédiction sur les 20% restants
+
+    # --- Random Forest ---
+    # Ensemble de 100 arbres de décision entraînés en parallèle
+    # Chaque arbre vote pour un prix, et on prend la moyenne de tous les votes
+    # Plus robuste que la régression linéaire car il capture des relations non-linéaires
     y_pred_rf = model.predict(X_test)
 
+    # Fonction utilitaire qui calcule les 3 métriques d'évaluation
     def get_metrics(y_true, y_pred):
+        # R² : entre 0 et 1, mesure la part de variance expliquée (1 = parfait)
+        # MAE : erreur absolue moyenne en euros (facile à interpréter)
+        # RMSE : pénalise davantage les grandes erreurs que le MAE
         return (
             r2_score(y_true, y_pred),
             mean_absolute_error(y_true, y_pred),
@@ -294,20 +340,20 @@ elif page == "Comparaison des modeles":
     r2_lr, mae_lr, rmse_lr = get_metrics(y_test, y_pred_lr)
     r2_rf, mae_rf, rmse_rf = get_metrics(y_test, y_pred_rf)
 
-    st.markdown('<p class="titre-section">Metriques comparatives</p>', unsafe_allow_html=True)
+    st.markdown('<p class="titre-section">Métriques comparatives</p>', unsafe_allow_html=True)
     comparatif = pd.DataFrame({
-        "Modele":   ["Regression Lineaire", "Random Forest"],
+        "Modèle":   ["Régression Linéaire", "Random Forest"],
         "R²":       [f"{r2_lr:.3f}",        f"{r2_rf:.3f}"],
         "MAE (€)":  [f"{mae_lr:,.0f}",      f"{mae_rf:,.0f}"],
         "RMSE (€)": [f"{rmse_lr:,.0f}",     f"{rmse_rf:,.0f}"],
-        "Verdict":  ["Score insuffisant",    "Modele retenu"]
+        "Verdict":  ["Score insuffisant",    "Modèle retenu"]
     })
     st.dataframe(comparatif, hide_index=True, use_container_width=True)
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown('<p class="titre-section">Regression Lineaire — Reel vs Predit</p>',
+        st.markdown('<p class="titre-section">Régression Linéaire — Réel vs Prédit</p>',
                     unsafe_allow_html=True)
         fig, ax = plt.subplots(figsize=(6, 5))
         lim = float(max(y_test.max(), y_pred_lr.max()))
@@ -325,7 +371,7 @@ elif page == "Comparaison des modeles":
         plt.close()
 
     with col2:
-        st.markdown('<p class="titre-section">Random Forest — Reel vs Predit</p>',
+        st.markdown('<p class="titre-section">Random Forest — Réel vs Prédit</p>',
                     unsafe_allow_html=True)
         fig, ax = plt.subplots(figsize=(6, 5))
         lim = float(max(y_test.max(), y_pred_rf.max()))
@@ -344,6 +390,7 @@ elif page == "Comparaison des modeles":
 
     st.markdown('<p class="titre-section">Importance des variables — Random Forest</p>',
                 unsafe_allow_html=True)
+    st.markdown("Plus la barre est longue, plus la variable a d'influence sur la prédiction du prix.")
     importances = pd.Series(model.feature_importances_, index=FEATURES).sort_values(ascending=True)
     fig, ax = plt.subplots(figsize=(8, 4))
     importances.plot(kind='barh', ax=ax, color='#0D9488')
@@ -359,9 +406,10 @@ elif page == "Comparaison des modeles":
 # PAGE 4 — PREDICTION INTERACTIVE
 # =============================================================================
 
-elif page == "Prediction interactive":
+elif page == "Prédiction interactive":
 
     st.title("Simulateur de prix 2026")
+    st.markdown("Renseignez les caractéristiques d'un bien pour obtenir une estimation de son prix en 2026.")
     st.markdown("---")
 
     col1, col2 = st.columns([1, 1])
@@ -369,13 +417,15 @@ elif page == "Prediction interactive":
     with col1:
         type_bien = st.selectbox("Type de bien", ["Maison", "Appartement"])
         surface   = st.slider("Surface habitable (m²)", 20, 300, 90)
-        pieces    = st.slider("Nombre de pieces",        1,  10,   4)
+        pieces    = st.slider("Nombre de pièces",        1,  10,   4)
         terrain   = st.slider("Surface terrain (m²)", 0, 2000, 300) if type_bien == "Maison" else 0
         latitude  = st.number_input("Latitude",  value=47.478419, format="%.6f")
         longitude = st.number_input("Longitude", value=-0.563166, format="%.6f")
-        st.caption("Coordonnees par defaut : centre d'Angers")
+        st.caption("Coordonnées par défaut : centre d'Angers")
 
     with col2:
+        # On construit le vecteur de features avec les valeurs choisies par l'utilisateur
+        # On fixe l'année à 2026 et le mois à juin (milieu de l'année) pour simuler 2026
         X_input = pd.DataFrame([{
             'surface_reelle_bati':       surface,
             'nombre_pieces_principales': pieces,
@@ -383,11 +433,13 @@ elif page == "Prediction interactive":
             'latitude':                  latitude,
             'longitude':                 longitude,
             'type_encode':               1 if type_bien == "Maison" else 0,
-            'annee':                     2026,
-            'mois':                      6,
-        }])[FEATURES]
+            'annee':                     2026,  # On simule une vente en 2026
+            'mois':                      6,     # Milieu d'année
+        }])[FEATURES]  # On réordonne les colonnes dans l'ordre exact attendu par le modèle
 
+        # Le modèle prédit un prix en euros à partir des caractéristiques du bien
         prix_predit    = model.predict(X_input)[0]
+        # On calcule le prix au m² pour faciliter la comparaison
         prix_m2_predit = prix_predit / surface
 
         st.markdown(f"""
@@ -407,28 +459,34 @@ elif page == "Prediction interactive":
         diff_m2   = ((prix_m2_predit - prix_m2_moy)  / prix_m2_moy)  * 100
 
         col_a, col_b = st.columns(2)
-        col_a.metric("vs prix moyen actuel", f"{prix_moyen:,.0f} €",    f"{diff:+.1f}%")
+        col_a.metric("vs prix moyen actuel", f"{prix_moyen:,.0f} €",     f"{diff:+.1f}%")
         col_b.metric("vs prix/m² actuel",    f"{prix_m2_moy:,.0f} €/m²", f"{diff_m2:+.1f}%")
 
 # =============================================================================
 # PAGE 5 — EVOLUTION 2024 → 2026
 # =============================================================================
 
-elif page == "Evolution 2024 - 2026":
+elif page == "Évolution 2024 - 2026":
 
-    st.title("Evolution des prix 2024 → 2025 → 2026")
+    st.title("Évolution des prix 2024 → 2025 → 2026")
+    st.markdown("Données réelles pour 2024 et 2025, prédiction du modèle pour 2026.")
     st.markdown("---")
 
+    # Calcul des statistiques réelles groupées par type de bien et par année
     stats = df.groupby([config.COL_TYPE, 'annee']).agg(
         prix_moyen = (config.COL_PRIX, 'mean'),
         prix_m2    = ('prix_m2',       'mean'),
         nb_ventes  = (config.COL_PRIX, 'count')
     ).round(0).reset_index()
 
+    # Fonction sécurisée : retourne None si la combinaison type/année n'existe pas
+    # (utile si les données 2025 ne sont pas encore disponibles)
     def safe_get(type_bien, annee, col='prix_moyen'):
         row = stats[(stats[config.COL_TYPE] == type_bien) & (stats['annee'] == annee)]
         return float(row[col].values[0]) if len(row) > 0 else None
 
+    # On essaie de charger les prédictions 2026 générées par moneli_predictions.ipynb
+    # Si le fichier n'existe pas encore, on affiche quand même les données réelles 2024-2025
     try:
         preds       = pd.read_csv(config.PREDICTIONS)
         pred_maison = preds[preds[config.COL_TYPE] == 'Maison']['prix_predit'].mean()
@@ -440,7 +498,7 @@ elif page == "Evolution 2024 - 2026":
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown('<p class="titre-section">Prix moyen</p>', unsafe_allow_html=True)
+        st.markdown('<p class="titre-section">Prix moyen par type de bien</p>', unsafe_allow_html=True)
         fig, ax = plt.subplots(figsize=(7, 5))
         patches = []
         for type_bien in config.TYPES_BIENS:
@@ -453,12 +511,14 @@ elif page == "Evolution 2024 - 2026":
             val_r = [v for v in [v24, v25] if v is not None]
 
             if ann_r:
+                # Trait plein = données réelles observées
                 ax.plot(ann_r, val_r, color=c, linewidth=2.5, marker='o', markersize=9)
                 for x, y in zip(ann_r, val_r):
                     ax.annotate(f'{y:,.0f} €', (x, y),
                                 textcoords='offset points', xytext=(0, 12),
                                 ha='center', fontsize=9, color=c)
             if v26 and ann_r:
+                # Trait pointillé = prédiction du modèle Random Forest pour 2026
                 ax.plot([ann_r[-1], 2026], [val_r[-1], v26], color=c,
                         linewidth=2.5, linestyle='--', marker='o', markersize=9,
                         markerfacecolor='white', markeredgewidth=2)
@@ -468,8 +528,8 @@ elif page == "Evolution 2024 - 2026":
             patches.append(mpatches.Patch(color=c, label=type_bien))
 
         ax.axvspan(2025.5, 2026.4, alpha=0.07, color='gray')
-        ligne_plein   = plt.Line2D([0],[0], color='gray', lw=2, label='Donnees reelles')
-        ligne_pointil = plt.Line2D([0],[0], color='gray', lw=2, linestyle='--', label='Prediction ML')
+        ligne_plein   = plt.Line2D([0],[0], color='gray', lw=2, label='Données réelles')
+        ligne_pointil = plt.Line2D([0],[0], color='gray', lw=2, linestyle='--', label='Prédiction ML')
         ax.legend(handles=patches + [ligne_plein, ligne_pointil], loc='upper left', fontsize=9)
         ax.set_xticks([2024, 2025, 2026])
         ax.grid(axis='y', alpha=0.3)
@@ -481,7 +541,7 @@ elif page == "Evolution 2024 - 2026":
         plt.close()
 
     with col2:
-        st.markdown('<p class="titre-section">Prix au m²</p>', unsafe_allow_html=True)
+        st.markdown('<p class="titre-section">Prix au m² par type de bien</p>', unsafe_allow_html=True)
         fig, ax = plt.subplots(figsize=(7, 5))
         for type_bien in config.TYPES_BIENS:
             c   = COULEURS[type_bien]
@@ -505,11 +565,11 @@ elif page == "Evolution 2024 - 2026":
         st.pyplot(fig)
         plt.close()
 
-    st.markdown('<p class="titre-section">Tableau recapitulatif</p>', unsafe_allow_html=True)
+    st.markdown('<p class="titre-section">Tableau récapitulatif</p>', unsafe_allow_html=True)
     st.dataframe(
         stats.rename(columns={
             config.COL_TYPE: 'Type',
-            'annee':         'Annee',
+            'annee':         'Année',
             'prix_moyen':    'Prix moyen (€)',
             'prix_m2':       'Prix/m² (€)',
             'nb_ventes':     'Nb ventes'
