@@ -61,6 +61,10 @@ st.markdown("""
         border-radius: 10px;
         padding: 1rem;
         border: 0.5px solid #E2E8F0;
+        color: #0F2A4A !important;
+    }
+    div[data-testid="stMetric"] * {
+        color: #0F2A4A !important;
     }
 
     /* Boite de prediction */
