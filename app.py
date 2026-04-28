@@ -41,7 +41,9 @@ st.markdown("""
 
     /* Sidebar foncee */
     section[data-testid="stSidebar"] { background-color: #0F2A4A; }
-    section[data-testid="stSidebar"] * { color: white !important; }
+   section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] span,
+    section[data-testid="stSidebar"] label { color: white !important; }
 
     /* Titres de section avec barre verte */
     .titre-section {
