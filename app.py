@@ -88,7 +88,7 @@ st.markdown("""
 @st.cache_data
 def load_data():
     # On lit les deux fichiers CSV séparément
-   df24 = pd.read_csv(config.CSV_2024)
+    df24 = pd.read_csv(config.CSV_2024)
     colonnes = list(df24.columns)
     df25 = pd.read_csv(config.CSV_2025, header=None, names=colonnes)
 
