@@ -131,7 +131,10 @@ df24 = pd.read_csv(config.CSV_2024)
 colonnes = list(df24.columns)
 df25 = pd.read_csv(config.CSV_2025, header=None, names=colonnes)
 ```
-
+```
+ faire un bon nettoyage : statut  en attente du retour d'arthur pour l'envoie de son fichier 
+```
 ---
 
 *Projet réalisé dans le cadre d'un cours de Machine Learning — Arthur · Mandengue · Moneli*
+
