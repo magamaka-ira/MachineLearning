@@ -11,7 +11,7 @@
 |---|---|---|
 | **Arthur** | Fusion des données, nettoyage, modèle Objectif 1 | `data_clean.csv` · `model_obj1.pkl` |
 | **Mandengue** | EDA, sélection des features, modèle Objectif 2 | `features_list.py` · `model_obj2.pkl` |
-| **Moneli** | Scénarios 2026, prédictions, visualisations, dashboard | `X_2026.csv` · `predictions_2026.csv` · `app.py` |
+| **Moneli** | Scénarios 2026, prédictions, visualisations, dashboard + app.py + streamlit | `X_2026.csv` · `predictions_2026.csv` · `app.py` `streamlit`|
 
 ---
 
@@ -130,10 +130,9 @@ Le fichier `49_2025.csv` n'a pas de ligne d'en-tête. Il faut le charger avec :
 df24 = pd.read_csv(config.CSV_2024)
 colonnes = list(df24.columns)
 df25 = pd.read_csv(config.CSV_2025, header=None, names=colonnes)
-```
-```
- faire un bon nettoyage : statut  en attente du retour d'arthur pour l'envoie de son fichier 
-```
+
+ # NB:  faire un bon nettoyage : statut  en attente du retour d'arthur pour l'envoie de son fichier 
+
 ---
 
 *Projet réalisé dans le cadre d'un cours de Machine Learning — Arthur · Mandengue · Moneli*
